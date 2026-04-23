@@ -21,20 +21,43 @@ team-kb = the content), the install UX (Nix primary, pipx fallback), the
 two-KB model (`~/.learnings/` personal + configurable team path), the
 confidence-gated write flow, and the cross-harness adapter story.
 
-## Planned install (not yet wired)
+## Install
+
+### Nix (primary)
+
+The flake handles the nano-graphrag transitive-dep mess for you:
 
 ```bash
-# Primary: Nix
+# One-shot run (no install).
+nix run github:stevengonsalvez/reflect-kb -- --help
+
+# Install into your profile.
 nix profile install github:stevengonsalvez/reflect-kb
+```
 
-# Fallback: pipx
-pipx install reflect-kb
+### Develop with Nix
 
-# Per-harness adapter (run once per harness you use)
+```bash
+nix develop
+# Drops you into a shell with python311 + all reflect-kb runtime deps
+# (nano-graphrag with the graspologic/hyppo/numba/llvmlite chain stripped).
+# Editable overlay:
+#   pip install -e . --no-deps --prefix $PWD/.venv-editable
+```
+
+### pipx (fallback)
+
+See the Troubleshooting section below for the `--no-deps` workaround for the
+nano-graphrag dep chain on Python ≥3.11.
+
+### Per-harness adapter
+
+```bash
 reflect adapter install claude-code
 reflect adapter install codex
 reflect adapter install copilot
 ```
+(Not yet wired — planned per the v4 spec.)
 
 ## Repo layout (target)
 
