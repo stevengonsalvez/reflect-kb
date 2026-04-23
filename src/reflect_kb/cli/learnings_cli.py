@@ -11,6 +11,7 @@ import os
 import hashlib
 import shutil
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -20,6 +21,8 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+
+from reflect_kb.metrics import write_metric
 
 console = Console(stderr=True)
 
@@ -136,10 +139,19 @@ def search(query: str, mode: str, tags: Optional[str], category: Optional[str],
     if category:
         search_query += f" category: {category}"
 
+    start = time.monotonic()
     try:
         engine = _get_graph_engine()
         context = engine.search(search_query, mode=mode, only_context=True)
     except Exception as e:
+        write_metric(
+            "search",
+            query=query,
+            mode=mode,
+            error=str(e),
+            hits=0,
+            latency_ms=int((time.monotonic() - start) * 1000),
+        )
         if output_format == "json":
             click.echo(json.dumps({
                 "query": query, "mode": mode, "error": str(e), "results": []
@@ -177,6 +189,14 @@ def search(query: str, mode: str, tags: Optional[str], category: Optional[str],
             title="[bold]GraphRAG Context[/bold]",
             border_style="green",
         ))
+
+    write_metric(
+        "search",
+        query=query,
+        mode=mode,
+        hits=len(context) if context else 0,
+        latency_ms=int((time.monotonic() - start) * 1000),
+    )
 
 
 @cli.command()
