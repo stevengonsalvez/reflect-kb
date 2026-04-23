@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "reflect-kb"
-version = "0.0.0"
+version = "0.1.0"
 description = "Universal cross-harness retrieval + learning KB for AI coding agents"
 readme = "README.md"
 license = { text = "MIT" }
@@ -58,12 +58,23 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
 ]
+# Full GraphRAG stack. `pip install .[graph]` will NOT resolve cleanly on
+# Python >=3.11 because nano-graphrag pulls graspologic -> hyppo -> numba ->
+# llvmlite (py<3.10 only). The supported flow is:
+#   pipx install .
+#   pipx inject reflect-kb nano-graphrag --pip-args="--no-deps"
+# (see README troubleshooting). This declaration exists to document intent
+# and so Nix can pick it up — it is not directly pip-installable today.
+graph = [
+    "nano-graphrag",
+]
 
 [project.scripts]
 reflect = "reflect_kb.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/stevengonsalvez/reflect-kb"
+Repository = "https://github.com/stevengonsalvez/reflect-kb"
 Issues = "https://github.com/stevengonsalvez/reflect-kb/issues"
 Specification = "https://github.com/stevengonsalvez/ai-coder-rules/blob/main/plans/reflect-v4-universal-install-spec.md"
 

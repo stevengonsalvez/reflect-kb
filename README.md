@@ -55,6 +55,41 @@ reflect-kb/
 The current tree only contains the top-level scaffolding. Subdirectories will
 land in follow-up tasks per the v4 plan.
 
+## Troubleshooting
+
+### `pipx install reflect-kb` fails when resolving nano-graphrag
+
+`nano-graphrag` pulls an unusable transitive dependency chain on Python
+≥3.11: `graspologic → hyppo → numba → llvmlite` — the last hop only builds
+for Python <3.10. The bare `pipx install .` flow works because `nano-graphrag`
+is **not** in the base `dependencies`; it lives under the `graph` extra.
+Installing the `graph` extra via pip/pipx therefore fails.
+
+The supported workaround is:
+
+```bash
+# 1. Install the CLI with its safe runtime deps.
+pipx install .
+
+# 2. Inject nano-graphrag without its broken transitive chain.
+pipx inject reflect-kb nano-graphrag --pip-args="--no-deps"
+
+# 3. Verify.
+reflect --help
+```
+
+The base install covers every import path `reflect` actually uses
+(sentence-transformers, nano-vectordb, networkx, tiktoken, openai, tenacity,
+hnswlib, xxhash, numpy, click, rich, pyyaml). The Nix flake handles this
+same `--no-deps` split out-of-band, so nix users do not hit this.
+
+### `reflect --help` prints but subcommands crash on import
+
+Early scaffold only — the full GraphRAG stack is gated behind the `graph`
+extra. If you installed base-only (no nano-graphrag), `reflect search` and
+`reflect reindex` will fail at import time. Complete the `pipx inject`
+step above.
+
 ## License
 
 MIT. See [`LICENSE`](./LICENSE).
