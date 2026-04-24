@@ -78,6 +78,35 @@ reflect-kb/
 The current tree only contains the top-level scaffolding. Subdirectories will
 land in follow-up tasks per the v4 plan.
 
+## Pre-commit (team-kb schema validation)
+
+Team-kb repos gate writes on the v4 frontmatter schema. Add reflect-kb as a
+hook source in your team-kb's `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/stevengonsalvez/reflect-kb
+    rev: v0.1.0          # pin to a tag once published
+    hooks:
+      - id: reflect-kb-frontmatter
+        # Default `files:` matches ^documents/.*\.md$ — override if you keep
+        # learnings under a different path.
+```
+
+Then run `pre-commit install` in the team-kb checkout. Every commit that
+touches `documents/*.md` will parse the YAML frontmatter and validate it
+against `schemas/frontmatter.schema.json`. Invalid documents fail the commit
+with a pointer to the offending field.
+
+You can also run the validator directly (same binary pre-commit invokes):
+
+```bash
+python scripts/validate_frontmatter.py documents/ # recurse
+python scripts/validate_frontmatter.py path/to/one-learning.md
+```
+
+Exit codes: `0` clean, `1` validation failure, `2` usage error.
+
 ## Troubleshooting
 
 ### `pipx install reflect-kb` fails when resolving nano-graphrag
