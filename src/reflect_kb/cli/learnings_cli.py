@@ -624,6 +624,70 @@ def stats():
     console.print(conf_table)
 
 
+@cli.command()
+@click.argument("file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--team-path",
+    type=click.Path(file_okay=False, resolve_path=True),
+    default=None,
+    help="Override team-kb path (defaults to the one set by `reflect team clone/init`).",
+)
+@click.option(
+    "--queue-dir",
+    type=click.Path(file_okay=False, resolve_path=True),
+    default=None,
+    help="Override review-queue directory for LOW-confidence routes.",
+)
+def share(file_path: str, team_path: Optional[str], queue_dir: Optional[str]):
+    """Route a learning through the confidence-gated write flow (v4 §Phase 4).
+
+    HIGH confidence → commits to team-kb main and pushes.
+    MED confidence  → branches + pushes + opens a draft PR via `gh`.
+    LOW confidence  → queues a pointer YAML in ~/.learnings/review-queue/.
+
+    Examples:
+        reflect share ./my-solution.md
+        reflect share ./my-solution.md --team-path ~/.learnings/team-mykb
+    """
+    from reflect_kb import write_flow
+    from reflect_kb.cli.team import _load_team_config
+
+    doc = Path(file_path).resolve()
+    resolved_team: Optional[Path] = None
+    if team_path:
+        resolved_team = Path(team_path)
+    else:
+        cfg = _load_team_config()
+        if cfg.get("path"):
+            resolved_team = Path(cfg["path"])
+
+    resolved_queue = Path(queue_dir) if queue_dir else write_flow.REVIEW_QUEUE_DIR
+
+    result = write_flow.route_document(
+        doc, team_root=resolved_team, queue_dir=resolved_queue,
+    )
+    write_metric(
+        "share",
+        route=result.route,
+        confidence=result.confidence,
+        pushed=result.pushed,
+        pr_opened=bool(result.pr_url),
+    )
+
+    console.print(f"[bold]route:[/bold] {result.route}")
+    console.print(f"[dim]title:[/dim] {result.title}")
+    if result.branch:
+        console.print(f"[dim]branch:[/dim] {result.branch}")
+    if result.commit_sha:
+        console.print(f"[dim]commit:[/dim] {result.commit_sha[:12]}")
+    if result.pr_url:
+        console.print(f"[green]PR:[/green] {result.pr_url}")
+    if result.queue_path:
+        console.print(f"[yellow]queued:[/yellow] {result.queue_path}")
+    for note in result.notes:
+        console.print(f"[dim]• {note}[/dim]")
+
+
 # Register subcommand groups. Import here (after `cli` exists) to keep
 # circular-import risk at zero; `team` only imports click + stdlib.
 from reflect_kb.cli.team import team as _team_group  # noqa: E402
