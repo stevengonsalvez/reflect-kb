@@ -624,5 +624,12 @@ def stats():
     console.print(conf_table)
 
 
+# Register subcommand groups. Import here (after `cli` exists) to keep
+# circular-import risk at zero; `team` only imports click + stdlib.
+from reflect_kb.cli.team import team as _team_group  # noqa: E402
+
+cli.add_command(_team_group)
+
+
 if __name__ == "__main__":
     cli()
