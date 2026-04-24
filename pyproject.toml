@@ -57,6 +57,7 @@ dev = [
     "pytest>=8",
     "ruff>=0.5",
     "mypy>=1.10",
+    "jsonschema>=4.20",
 ]
 # Full GraphRAG stack. `pip install .[graph]` will NOT resolve cleanly on
 # Python >=3.11 because nano-graphrag pulls graspologic -> hyppo -> numba ->
