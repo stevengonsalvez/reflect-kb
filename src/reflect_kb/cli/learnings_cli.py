@@ -691,8 +691,10 @@ def share(file_path: str, team_path: Optional[str], queue_dir: Optional[str]):
 # Register subcommand groups. Import here (after `cli` exists) to keep
 # circular-import risk at zero; `team` only imports click + stdlib.
 from reflect_kb.cli.team import team as _team_group  # noqa: E402
+from reflect_kb.cli.metrics_cli import metrics_group as _metrics_group  # noqa: E402
 
 cli.add_command(_team_group)
+cli.add_command(_metrics_group)
 
 
 if __name__ == "__main__":
