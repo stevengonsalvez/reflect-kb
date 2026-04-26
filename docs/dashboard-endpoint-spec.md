@@ -139,8 +139,8 @@ is the convention. `200` and `204` are also accepted.
 | `400`  | Malformed JSON / missing required fields               | Surface to user; no retry       |
 | `401`  | Missing/invalid token                                  | Surface to user; no retry       |
 | `403`  | Token lacks permission                                 | Surface to user; no retry       |
-| `409`  | Duplicate `run_id` rejected (server prefers explicit) | Treated as success by client    |
-| `429`  | Rate-limited                                           | Retry once after `Retry-After`  |
+| `409`  | Duplicate `run_id` rejected (server prefers explicit) | Surface to user; exit 1 (no retry, no special-casing). Servers SHOULD prefer the idempotent upsert in §4 over rejecting with 409 — the client treats it as a normal error. |
+| `429`  | Rate-limited                                           | Surface to user; exit 1. The client does **not** parse `Retry-After` — `reflect dashboard sync` is a one-shot CLI; the user reruns it. |
 | `5xx`  | Server-side hiccup                                     | **Retry once**, then surface    |
 
 Error bodies SHOULD be JSON with `{"error": "..."}`, but the client only
@@ -148,10 +148,16 @@ shows the first ~200 chars verbatim, so plain-text 5xx errors are tolerated.
 
 ## 6. Retry policy
 
-The client retries **exactly once** on `5xx`. There is no exponential
+The client retries **exactly once** on `5xx` *or* on a transport-layer
+failure (`httpx.ConnectError`, `httpx.TimeoutException`, etc. — anything
+that's a subclass of `httpx.TransportError`). There is no exponential
 backoff — `reflect dashboard sync` is a one-shot CLI, not a long-running
 agent. If the second attempt also fails, exit code 1 + an error message is
 printed for the user to investigate.
+
+`4xx` responses (including `409` and `429`) are **never** retried — they
+indicate a client/config problem (or a deliberate server policy) that
+retrying within the same invocation cannot fix.
 
 Servers SHOULD NOT rely on the client retrying — implement durable writes
 on first acceptance, not "we'll catch it on the retry."

@@ -2,7 +2,8 @@
 
 Reads ``[dashboard]`` from ``~/.learnings/config.toml`` (or the
 ``REFLECT_CONFIG_PATH`` override) and POSTs aggregated stats to
-``<endpoint>/v1/ingest`` with a Bearer token. One retry on 5xx.
+``<endpoint>/v1/ingest`` with a Bearer token. One retry on 5xx *or* on a
+transport-layer failure (connect/timeout/read).
 
 Spec for the receiving end lives at
 ``docs/dashboard-endpoint-spec.md``.
@@ -33,12 +34,24 @@ class DashboardConfig:
     client_id: str  # stable per-machine identifier
 
 
+_GENERIC_HOSTNAMES = frozenset({"", "localhost", "unknown", "localhost.localdomain"})
+
+
 def _stable_client_id() -> str:
     """Best-effort stable client ID. Hostname is usually enough; fall back to
-    a UUID derived from the MAC if hostname is generic.
+    a hash of the MAC address (via :func:`uuid.getnode`) when the hostname is
+    generic (``localhost``, ``unknown``, empty) so two boxes don't share an ID.
     """
-    host = socket.gethostname() or "unknown"
-    return host
+    host = (socket.gethostname() or "").strip()
+    if host.lower() not in _GENERIC_HOSTNAMES:
+        return host
+    # uuid.getnode() returns the MAC as a 48-bit int, or a random 48-bit int
+    # with the multicast bit set if no NIC is reachable. Either way, hashing +
+    # truncating yields a stable, opaque per-machine label that doesn't leak
+    # the raw MAC.
+    node = uuid.getnode()
+    digest = uuid.uuid5(uuid.NAMESPACE_OID, f"reflect-kb-mac:{node:012x}").hex
+    return f"machine-{digest[:12]}"
 
 
 def load_config(path: Optional[Path] = None) -> Optional[DashboardConfig]:
@@ -89,11 +102,14 @@ def post_stats(
     client: Optional[httpx.Client] = None,
     timeout: float = 10.0,
 ) -> httpx.Response:
-    """POST aggregated stats. Retries once on 5xx. Returns the final response.
+    """POST aggregated stats. Retries once on transport errors or 5xx.
 
     The caller decides what to do with non-2xx (the CLI surfaces it as an
     error). 4xx is *not* retried — that's a client/config bug, retrying
-    won't fix it.
+    won't fix it. A transport-layer failure (connect/timeout/read) on the
+    first attempt is retried once, matching the 5xx semantics; if the second
+    attempt also fails the exception propagates to :func:`sync` which turns
+    it into exit code 1.
     """
     payload = build_payload(stats, client_id=config.client_id)
     url = f"{config.endpoint}{INGEST_PATH}"
@@ -105,16 +121,27 @@ def post_stats(
 
     owns_client = client is None
     http = client or httpx.Client(timeout=timeout)
+    last_response: Optional[httpx.Response] = None
     try:
         for attempt in range(2):
-            response = http.post(url, json=payload, headers=headers)
+            try:
+                response = http.post(url, json=payload, headers=headers)
+            except httpx.TransportError:
+                # Connect/timeout/read errors are transient — retry once,
+                # then re-raise so sync() reports them with exit 1.
+                if attempt == 1:
+                    raise
+                continue
+            last_response = response
             if response.status_code < 500:
                 return response
             # 5xx — retry once. Server-side hiccup is usually transient.
             if attempt == 1:
                 return response
-        # Unreachable, but mypy doesn't know.
-        return response  # pragma: no cover
+        # Unreachable in practice (loop either returns or raises), but keep a
+        # defensive fallback so the type checker is happy.
+        assert last_response is not None  # pragma: no cover
+        return last_response  # pragma: no cover
     finally:
         if owns_client:
             http.close()

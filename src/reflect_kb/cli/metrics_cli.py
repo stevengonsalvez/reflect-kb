@@ -99,10 +99,21 @@ def dashboard_group() -> None:
     default=None,
     help=f"Override config file (default: {dashboard.DEFAULT_CONFIG_PATH}).",
 )
-def dashboard_sync(metrics_path: Optional[Path], config_path: Optional[Path]) -> None:
+@click.option(
+    "--window-days",
+    type=int,
+    default=7,
+    show_default=True,
+    help="Sliding-window length used for the `last_*d` stats block (mirrors `reflect metrics stats`).",
+)
+def dashboard_sync(
+    metrics_path: Optional[Path],
+    config_path: Optional[Path],
+    window_days: int,
+) -> None:
     """POST aggregated stats to the configured dashboard endpoint."""
     path = metrics_path or METRICS_PATH
-    report = metrics_stats.aggregate(path)
+    report = metrics_stats.aggregate(path, window_days=window_days)
     code, message = dashboard.sync(report.to_dict(), config_path=config_path)
     click.echo(message)
     sys.exit(code)
