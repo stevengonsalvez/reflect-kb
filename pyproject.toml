@@ -31,25 +31,17 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development",
 ]
-# Runtime deps for the CLI + retrieval stack. nano-graphrag itself must be
-# installed with --no-deps (broken transitive chain through graspologic/hyppo/
-# numba/llvmlite on Python 3.11+) — Nix and pipx install scripts handle that
-# out-of-band. Everything here is the subset we actually import.
+# Slim base deps — just what `reflect --help`, `reflect team`, `reflect
+# share`, `reflect metrics ...`, and `reflect metrics dashboard sync` need.
+# Heavy ML deps (sentence-transformers, torch via SBERT, nano-graphrag
+# import-time chain) live in `[graph]` so a plain `pipx install .` doesn't
+# pull ~2GB on every CI run. The graph_engine module already lazy-imports
+# them inside `_get_graph_engine()`, so `reflect search --help` resolves
+# even without `[graph]` installed.
 dependencies = [
     "click>=8.0",
     "rich>=13.0",
     "pyyaml>=6.0",
-    "sentence-transformers>=2.2.0",
-    "numpy>=1.24.0",
-    "networkx>=3.0",
-    "tiktoken>=0.5.0",
-    "nano-vectordb",
-    # nano-graphrag import-time deps we satisfy manually (since we install it
-    # with --no-deps). Schema/migration work lands in later phases.
-    "openai>=1.0",
-    "tenacity>=8.0",
-    "hnswlib>=0.7.0",
-    "xxhash>=3.0",
     # Dashboard sync client (P5.3); see src/reflect_kb/dashboard.py.
     "httpx>=0.27",
 ]
@@ -65,11 +57,24 @@ dev = [
 # Full GraphRAG stack. `pip install .[graph]` will NOT resolve cleanly on
 # Python >=3.11 because nano-graphrag pulls graspologic -> hyppo -> numba ->
 # llvmlite (py<3.10 only). The supported flow is:
+#   pipx install .[graph] --pip-args="--no-deps" --include-deps
+# or
 #   pipx install .
 #   pipx inject reflect-kb nano-graphrag --pip-args="--no-deps"
-# (see README troubleshooting). This declaration exists to document intent
-# and so Nix can pick it up — it is not directly pip-installable today.
+# (see README troubleshooting). Nix picks the full set up via `[graph]` and
+# patches nano-graphrag's deps in flake.nix.
 graph = [
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.24.0",
+    "networkx>=3.0",
+    "tiktoken>=0.5.0",
+    "nano-vectordb",
+    # nano-graphrag import-time deps we satisfy manually (since we install it
+    # with --no-deps).
+    "openai>=1.0",
+    "tenacity>=8.0",
+    "hnswlib>=0.7.0",
+    "xxhash>=3.0",
     "nano-graphrag",
 ]
 

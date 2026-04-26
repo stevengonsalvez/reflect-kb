@@ -87,6 +87,7 @@
           click
           rich
           pyyaml
+          httpx
           # Embeddings + numerics
           sentence-transformers
           numpy
@@ -106,6 +107,9 @@
         ]);
 
         # ── reflect-kb application ─────────────────────────────────────────
+        # Base CLI deps + the full `[graph]` extra so `nix run .#reflect-kb`
+        # gets a working `reflect search` out of the box. pipx users on
+        # macOS/Linux skip the heavy chain (see pyproject.toml comment).
         reflect-kb = pyPkgs.buildPythonApplication {
           pname = "reflect-kb";
           version = "0.1.0";
@@ -113,9 +117,12 @@
           src = ./.;
           build-system = [ pyPkgs.hatchling ];
           dependencies = with pyPkgs; [
+            # base
             click
             rich
             pyyaml
+            httpx
+            # [graph] extra
             sentence-transformers
             numpy
             networkx
