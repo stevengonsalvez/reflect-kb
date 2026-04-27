@@ -4,8 +4,8 @@ Pure stdlib — no pandas, no numpy. The metrics file is bounded to ~10 MB by
 the writer's rotation, so a single linear scan is fine for any realistic
 fleet size.
 
-Returns a stable :class:`StatsReport` shape that the CLI renders (table or
-JSON) and the dashboard sync (P5.3) POSTs verbatim.
+Returns a stable :class:`StatsReport` shape that the CLI renders as table or
+JSON.
 """
 
 from __future__ import annotations

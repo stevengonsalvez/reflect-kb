@@ -1,15 +1,12 @@
-"""``reflect metrics`` subgroup — aggregate the JSONL log + opt-in dashboard sync.
+"""``reflect metrics`` subgroup — aggregate the JSONL log.
 
-The aggregator lives in :mod:`reflect_kb.metrics_stats` (no click deps); the
-dashboard client in :mod:`reflect_kb.dashboard`. This file is purely
-presentation + CLI plumbing.
+The aggregator lives in :mod:`reflect_kb.metrics_stats` (no click deps);
+this file is purely presentation + CLI plumbing.
 """
 
 from __future__ import annotations
 
 import json
-import sys
-from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -17,7 +14,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from reflect_kb import dashboard, metrics_stats
+from reflect_kb import metrics_stats
 from reflect_kb.metrics import METRICS_PATH
 
 console = Console()
@@ -80,40 +77,3 @@ def stats(metrics_path: Optional[Path], fmt: str, window_days: int) -> None:
     console.print(f"[dim]metrics file: {report.metrics_path}[/dim]")
     console.print(_render_window_table(report.last_7d))
     console.print(_render_window_table(report.all_time))
-
-
-@metrics_group.group("dashboard")
-def dashboard_group() -> None:
-    """Opt-in dashboard sync (POST aggregated stats to a remote endpoint)."""
-
-
-@dashboard_group.command("sync")
-@click.option(
-    "--metrics-path",
-    type=click.Path(dir_okay=False, path_type=Path),
-    default=None,
-)
-@click.option(
-    "--config-path",
-    type=click.Path(dir_okay=False, path_type=Path),
-    default=None,
-    help=f"Override config file (default: {dashboard.DEFAULT_CONFIG_PATH}).",
-)
-@click.option(
-    "--window-days",
-    type=int,
-    default=7,
-    show_default=True,
-    help="Sliding-window length used for the `last_*d` stats block (mirrors `reflect metrics stats`).",
-)
-def dashboard_sync(
-    metrics_path: Optional[Path],
-    config_path: Optional[Path],
-    window_days: int,
-) -> None:
-    """POST aggregated stats to the configured dashboard endpoint."""
-    path = metrics_path or METRICS_PATH
-    report = metrics_stats.aggregate(path, window_days=window_days)
-    code, message = dashboard.sync(report.to_dict(), config_path=config_path)
-    click.echo(message)
-    sys.exit(code)

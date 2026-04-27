@@ -64,7 +64,7 @@ def test_missing_metrics_file_returns_empty_stats(tmp_path):
 
 
 def test_to_dict_is_jsonable():
-    """Stats payload must be plain-JSON-serialisable for dashboard sync."""
+    """Stats payload must be plain-JSON-serialisable."""
     import json
     report = metrics_stats.aggregate(FIXTURE, now=NOW)
     # round-trip — no custom types should survive
