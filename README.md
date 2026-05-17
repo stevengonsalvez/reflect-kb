@@ -1,133 +1,48 @@
-# reflect-kb
+# reflect-kb has moved
 
-> Universal cross-harness retrieval + learning knowledge base for AI coding agents.
+> **This repository is archived.** Active development of reflect-kb now happens inside the [agents-in-a-box](https://github.com/stevengonsalvez/agents-in-a-box) monorepo.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.1-green.svg)](./pyproject.toml)
+## New location
 
-## What it does
+[`github.com/stevengonsalvez/agents-in-a-box/tree/main/reflect-kb`](https://github.com/stevengonsalvez/agents-in-a-box/tree/main/reflect-kb)
 
-reflect-kb implements the **capture → index → recall** loop for agent knowledge. After every session,
-the agents-in-a-box reflect plugin drains the ingest queue (`~/.learnings/ingest/`), calls `reflect add`
-for each pending document, and rebuilds the graph index. At the start of the next session, `reflect search`
-recalls the most relevant prior learnings and surfaces them before the agent touches the first file.
-The result is a compounding knowledge base that gets smarter the more it is used — without per-session
-context-window blowup. Works across Claude Code, Codex CLI, and GitHub Copilot via cross-harness adapters
-baked into the plugin.
-
-## Install
-
-Recommended: `uv tool install` with the `[graph]` extra (pulls the full GraphRAG + vector stack):
-
-```bash
-uv tool install --upgrade 'git+https://github.com/stevengonsalvez/reflect-kb.git[graph]'
-```
-
-Verify: `reflect --version` should print `0.1.x`.
-
-**Post-consolidation install (after Phase 7 of the monorepo plan):**
+## New install command
 
 ```bash
 uv tool install --upgrade 'git+https://github.com/stevengonsalvez/agents-in-a-box.git#subdirectory=reflect-kb[graph]'
 ```
 
-Both URLs will resolve during the transition window.
-
-## Quick start
+Verify:
 
 ```bash
-# 1. Initialise the KB (one time per machine — creates ~/.claude/global-learnings/)
-reflect init
-
-# 2. Add a learning document (with optional entity sidecar)
-reflect add ./my-solution.md --entities ./my-solution.entities.yaml
-
-# 3. Search the knowledge base
-reflect search "how did we fix the tokio runtime panic"
-
-# 4. Show KB statistics
-reflect stats
-
-# 5. Drill into the statusline dashboard
-reflect timeline --explain TOK
+reflect --version    # → reflect, version 0.1.x
 ```
 
-## Subcommands
+## What changed
 
-| Command | What it does |
-|---|---|
-| [`reflect init`](docs/usage.md#reflect-init) | Initialise the KB at `~/.claude/global-learnings/` |
-| [`reflect add`](docs/usage.md#reflect-add) | Add a learning doc; `--force` for non-interactive overwrite |
-| [`reflect search`](docs/usage.md#reflect-search) | Hybrid GraphRAG + vector search over the KB |
-| [`reflect reindex`](docs/usage.md#reflect-reindex) | Rebuild the full graph index from all documents |
-| [`reflect stats`](docs/usage.md#reflect-stats) | Show KB metrics (doc count, entities, relationships, confidence) |
-| [`reflect critical-patterns`](docs/usage.md#reflect-critical-patterns) | Surface high-confidence, widely-applicable patterns |
-| [`reflect generate-sidecars`](docs/usage.md#reflect-generate-sidecars) | Backfill missing `.entities.yaml` sidecars (heuristic, no LLM) |
-| [`reflect metrics stats`](docs/usage.md#reflect-metrics-stats) | Aggregate the recall-metrics JSONL log (hit rate, latency) |
-| [`reflect timeline`](docs/usage.md#reflect-timeline) | Drill down on statusline dashboard rows (REC/MEM/ING/DRN/TOK/ERR/COM/AGT) |
+Today (2026-05-17) reflect-kb moved from its standalone repo into the agents-in-a-box monorepo as a workspace member. The Claude Code plugin that orchestrates it (`reflect@agents-in-a-box`) also moved from `toolkit/packages/plugins/reflect/` to `plugins/reflect/` at the monorepo root, alongside `reflect-kb/`.
 
-See [docs/usage.md](docs/usage.md) for per-subcommand synopsis, all flags, examples, and common errors.
+The two were tightly coupled — most changes touched both the library and the plugin in lockstep. Keeping them in the same repo collapses the cross-repo coordination overhead. The KB content (`~/.learnings/`) stays as a separate sibling repo (it's data, not code).
 
-## Architecture
+## Why the move
 
+- reflect-kb's only real consumer was the agents-in-a-box reflect plugin
+- Cross-repo changes (parser fixes → SKILL.md updates → re-run ingest) used to require 2-3 coordinated PRs
+- Workspace pyproject.toml at the monorepo root lets uv install the package from a subdirectory
+
+## For existing users
+
+The old `uv tool install --upgrade 'git+https://github.com/stevengonsalvez/reflect-kb.git[graph]'` install URL still works via GitHub's automatic repo redirect, but please migrate to the new install command above. Existing local installs continue to work — `reflect` binary on PATH is unchanged.
+
+## Companion plugin
+
+Claude Code plugin (orchestrator, hooks, statusline, recall):
+
+```bash
+claude plugin marketplace add stevengonsalvez/agents-in-a-box
+claude plugin install reflect@agents-in-a-box
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  agents-in-a-box reflect plugin  (orchestrator)                │
-│  ┌─────────────────┐  ┌──────────────────┐                     │
-│  │ PreCompact hook │  │ SessionStart hook │                     │
-│  │  drains ingest  │  │  calls `reflect   │                     │
-│  │  queue; calls   │  │   search` + injects│                    │
-│  │ `reflect add`   │  │   context         │                     │
-│  └────────┬────────┘  └────────┬──────────┘                    │
-│           │                    │                                │
-└───────────┼────────────────────┼────────────────────────────────┘
-            │                    │
-            ▼                    ▼
-┌───────────────────────────────────────────────────────────────┐
-│  reflect-kb  (this library — Python CLI + retrieval engine)   │
-│  • GraphRAG index (nano-graphrag)                             │
-│  • Vector search (nano-vectordb + sentence-transformers)      │
-│  • Entity sidecar store (.entities.yaml)                      │
-│  • Metrics JSONL writer                                       │
-└───────────────────────────────┬───────────────────────────────┘
-                                │  reads/writes
-                                ▼
-┌───────────────────────────────────────────────────────────────┐
-│  learnings-kb  (~/.claude/global-learnings/ or               │
-│                 $GLOBAL_LEARNINGS_PATH)                       │
-│  • documents/*.md          knowledge documents                │
-│  • documents/*.entities.yaml   entity sidecars                │
-│  • nano_graphrag_cache/    graph index (gitignored)           │
-│  • metrics.jsonl           recall telemetry (rotated 10 MB)   │
-└───────────────────────────────────────────────────────────────┘
-```
-
-**Key split:** reflect-kb is the data layer — it knows nothing about Claude Code. The plugin is the
-orchestrator — it knows when to drain, recall, and surface. The learnings-kb content directory is a
-separate git repo (private; content not code).
-
-## Companion tooling
-
-- **Claude Code plugin:** `claude plugin install reflect@agents-in-a-box`
-  — ships the PreCompact + SessionStart hooks, drain script, recall skill, and statusline timeline.
-- **Content directory:** `~/.claude/global-learnings/` (override with `$GLOBAL_LEARNINGS_PATH`).
-
-## What's new in 0.1.1
-
-- **`--force` flag on `reflect add`** — non-interactive overwrite for ingest pipelines and subprocess
-  contexts where `click.confirm` cannot read a TTY. Without `--force`, non-TTY stdin now fails loudly
-  rather than silently dropping the file.
-- **Content-hash `doc_id`** — `doc_id` is now `slug(title) + sha256(title + body)[:6]`. Previously
-  hashing title-only caused silent collisions when two documents shared a slug-able title. Same title +
-  same body = same id (idempotent re-ingest). Same title + different body = distinct ids.
-- **`reflect timeline --explain ROW`** — drill-down on a single statusline dashboard row (REC, MEM,
-  ING, DRN, TOK, ERR, COM, AGT, or `all`). Delegates to the reflect plugin's `reflect_timeline.sh`
-  helper, auto-discovered from `$CLAUDE_PLUGIN_ROOT` or the plugin cache.
-- **`reflect metrics stats`** — aggregate the recall-metrics JSONL log: total events, hit rate,
-  p50/p95 latency, top tags. Supports `--format json` for machine consumption and `--window-days` for
-  custom time windows.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+MIT. See the monorepo at the link above.
